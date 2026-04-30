@@ -281,9 +281,9 @@ fn main() {
     let (ip, port) = parse_args();
     let base_url = format!("{}:{}", ip, port);
     let agent = vec![
+        "both Claude Code and Codex",
         "Claude Code",
         "Codex",
-        "both Claude Code and Codex",
         "exit",
     ];
     let selection = Select::with_theme(&ColorfulTheme::default())
@@ -295,12 +295,12 @@ fn main() {
     match selection {
         0 => {
             hook_cc(&base_url);
-        }
-        1 => {
             hook_codex(&base_url);
         }
-        2 => {
+        1 => {
             hook_cc(&base_url);
+        }
+        2 => {
             hook_codex(&base_url);
         }
         3 => {
