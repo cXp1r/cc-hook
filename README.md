@@ -1,6 +1,6 @@
 # cc-hook
 
-A CLI tool that installs Claude Code hooks to stream all session events to an HTTP endpoint.
+A CLI tool that installs [Claude Code / Codex] hooks to stream all session events to an HTTP endpoint.
 
 ## What it does
 
@@ -8,6 +8,7 @@ Work together with another project to implement CC message display.
 
 `cc-hook` writes a complete set of [Claude Code hooks](https://docs.anthropic.com/en/docs/claude-code/hooks) into your `settings.json`, each configured to report events via `curl` to `127.0.0.1:2221`. This lets you observe and log every event in a Claude Code session in real time.
 
+`cc-hook` also can write hooks for codex
 ### Hooked events
 
 | Hook | Path |
