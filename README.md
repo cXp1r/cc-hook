@@ -30,7 +30,9 @@ Tool-level hooks append the tool name to the URL path (e.g., `/PreToolUse/Bash`,
 ## Usage
 
 ```bash
-cargo run
+cc-hook.exe
+cc-hook.exe -- --ip x.x.x.x --port xxxx
+cc-hook.exe -- --port 3000
 ```
 
 You'll be prompted to choose where to install the hooks:
@@ -40,10 +42,3 @@ You'll be prompted to choose where to install the hooks:
 
 The tool creates a `.bak` backup before writing. If the target file doesn't exist, you'll be asked whether to create it.
 
-## Building
-
-```bash
-cargo build --release
-```
-
-The binary will be at `target/release/cc-hook`.
