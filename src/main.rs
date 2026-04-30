@@ -3,89 +3,105 @@ use serde_json::{json, Value};
 use std::env;
 use std::fs;
 use std::path::PathBuf;
+use std::vec;
+use toml_edit::{DocumentMut, value};
 
-const BASE_URL: &str = "127.0.0.1:2221";
+fn parse_args() -> (String, u16) {
+    let mut ip = String::from("127.0.0.1");
+    let mut port: u16 = 2221;
 
-fn make_curl_hook(path: &str) -> Value {
+    let args: Vec<String> = env::args().collect();
+    let mut i = 1;
+    while i < args.len() {
+        match args[i].as_str() {
+            "--ip" => {
+                if i + 1 < args.len() {
+                    ip = args[i + 1].clone();
+                    i += 1;
+                }
+            }
+            "--port" => {
+                if i + 1 < args.len() {
+                    port = args[i + 1].parse().unwrap_or(2221);
+                    i += 1;
+                }
+            }
+            _ => {}
+        }
+        i += 1;
+    }
+    (ip, port)
+}
+
+fn make_curl_hook(base_url: &str, path: &str) -> Value {
     json!({
         "type": "command",
-        "command": format!("curl -s http://{}/{}", BASE_URL, path)
+        "command": format!("curl -s http://{}/{}", base_url, path)
     })
 }
 
-fn make_curl_hook_with_tool(path: &str) -> Value {
-    // 读 stdin 拿 tool_name，拼到路径上
+fn make_curl_hook_with_tool(base_url: &str, path: &str) -> Value {
     json!({
         "type": "command",
         "command": format!(
             "input=$(cat); tool=$(echo $input | jq -r '.tool_name // \"unknown\"'); curl -s http://{}/{}/$(echo $tool | tr '/' '_')",
-            BASE_URL, path
+            base_url, path
         )
     })
 }
 
-fn build_hooks() -> Value {
+fn build_hooks(base_url: &str) -> Value {
     json!({
-        // ── 每次工具调用前 ──
         "PreToolUse": [{
             "matcher": ".*",
-            "hooks": [make_curl_hook_with_tool("PreToolUse")]
+            "hooks": [make_curl_hook_with_tool(base_url, "PreToolUse")]
         }],
 
-        // ── 每次工具调用后 ──
         "PostToolUse": [{
             "matcher": ".*",
-            "hooks": [make_curl_hook_with_tool("PostToolUse")]
+            "hooks": [make_curl_hook_with_tool(base_url, "PostToolUse")]
         }],
 
-        // ── 工具调用失败 ──
         "PostToolUseFailure": [{
             "matcher": ".*",
-            "hooks": [make_curl_hook_with_tool("PostToolUseFailure")]
+            "hooks": [make_curl_hook_with_tool(base_url, "PostToolUseFailure")]
         }],
 
-        // ── 权限请求 ──
         "PermissionRequest": [{
             "matcher": ".*",
-            "hooks": [make_curl_hook("PermissionRequest")]
+            "hooks": [make_curl_hook(base_url, "PermissionRequest")]
         }],
 
-        // ── Claude 完成整轮回答 ──
         "Stop": [{
-            "hooks": [make_curl_hook("Stop")]
+            "hooks": [make_curl_hook(base_url, "Stop")]
         }],
 
-        // ── 子 agent 完成 ──
         "SubagentStop": [{
-            "hooks": [make_curl_hook("SubagentStop")]
+            "hooks": [make_curl_hook(base_url, "SubagentStop")]
         }],
 
-        // ── 需要用户操作/通知 ──
         "Notification": [{
-            "hooks": [make_curl_hook("Notification")]
+            "hooks": [make_curl_hook(base_url, "Notification")]
         }],
 
-        // ── 用户提交 prompt ──
         "UserPromptSubmit": [{
-            "hooks": [make_curl_hook("UserPromptSubmit")]
+            "hooks": [make_curl_hook(base_url, "UserPromptSubmit")]
         }],
 
-        // ── Session 开始/结束 ──
         "SessionStart": [{
-            "hooks": [make_curl_hook("SessionStart")]
+            "hooks": [make_curl_hook(base_url, "SessionStart")]
         }],
         "SessionEnd": [{
-            "hooks": [make_curl_hook("SessionEnd")]
+            "hooks": [make_curl_hook(base_url, "SessionEnd")]
         }],
 
-        // ── 上下文压缩前 ──
         "PreCompact": [{
-            "hooks": [make_curl_hook("PreCompact")]
+            "hooks": [make_curl_hook(base_url, "PreCompact")]
         }]
     })
 }
 
-fn main() {
+fn hook_cc(base_url: &str) {
     let items = vec![
         "global",
         "this workspace",
@@ -93,10 +109,10 @@ fn main() {
         "exit",
     ];
 
-    // 把 config_path 定义在 loop 外，loop 用 break value 返回
     let config_path: PathBuf = loop {
+        println!("=============================================\n======        Claude Code Hooks        ======\n=============================================");
         let selection = Select::with_theme(&ColorfulTheme::default())
-            .with_prompt("where do you want to add claude code hooks?")
+            .with_prompt("where do you want to add Claude Code hooks?")
             .items(&items)
             .default(0)
             .interact()
@@ -109,11 +125,6 @@ fn main() {
                 {
                     let userprofile = std::env::var("USERPROFILE").expect("USERPROFILE not set");
                     PathBuf::from(userprofile).join(".claude").join("settings.json")
-                }
-                #[cfg(not(target_os = "windows"))]
-                {
-                    let home = std::env::var("HOME").expect("HOME not set");
-                    PathBuf::from(home).join(".claude").join("settings.json")
                 }
             }
             1 => {
@@ -150,26 +161,153 @@ fn main() {
                 println!("Created file at: {}", path.display());
                 break path;
             }
-            // false 则继续 loop 重新选
         }
     };
 
-    // 读取现有配置
     let mut config: Value = {
         let content = fs::read_to_string(&config_path).expect("Failed to read config file");
         serde_json::from_str(&content).unwrap_or(json!({}))
     };
 
-    // 备份原文件
     let backup = config_path.with_extension("json.bak");
     fs::copy(&config_path, &backup).expect("Failed to create backup");
     println!("Backup created at: {}", backup.display());
 
-    // 写入 hooks
-    config["hooks"] = build_hooks();
+    config["hooks"] = build_hooks(&base_url);
     let output = serde_json::to_string_pretty(&config).expect("Failed to serialize config");
     fs::write(&config_path, output).expect("Failed to write config file");
 
-    println!("✓ Write to hooks successfully, all events reported to http://{}/[EventName]", BASE_URL);
+    println!("✓ Write to hooks successfully, all events reported to http://{}/[EventName]", base_url);
     println!("  PreToolUse / PostToolUse will append the tool name to the path, e.g., /PreToolUse/Bash");
+}
+
+fn hook_codex(base_url: &str) {
+    let items = vec![
+        "global",
+        "this workspace",
+        "select a file",
+        "exit",
+    ];
+
+    let config_path: [PathBuf; 2] = loop {
+        println!("=============================================\n======        Codex Hooks        ======\n=============================================");
+        let selection = Select::with_theme(&ColorfulTheme::default())
+            .with_prompt("where do you want to add Codex hooks?")
+            .items(&items)
+            .default(0)
+            .interact()
+            .unwrap();
+
+        let path: [PathBuf; 2] = match selection {
+            0 => {
+                println!("You chose to add hooks globally.");
+                #[cfg(target_os = "windows")]
+                {
+                    let userprofile = std::env::var("USERPROFILE").expect("USERPROFILE not set");
+                    [PathBuf::from(&userprofile).join(".codex").join("hooks.json"),PathBuf::from(&userprofile).join(".codex").join("config.toml")]
+                }
+            }
+            1 => {
+                println!("You chose to add hooks to this workspace.");
+                [env::current_dir().unwrap().join(".codex").join("hooks.json"), env::current_dir().unwrap().join(".codex").join("config.toml")]
+            }
+            2 => {
+                println!("You chose to select a file.");
+                let file_path: String = Input::new()
+                    .with_prompt("Enter the path without extension (e.g., /path/to/hooks or /path/to/config)")
+                    .interact_text()
+                    .unwrap();
+                [PathBuf::from(&file_path).join("hooks.json"), PathBuf::from(&file_path).join("config.toml")]
+            }
+            _ => {
+                println!("Exiting.");
+                return;
+            }
+        };
+
+        if path[0].exists() && path[1].exists() {
+            println!("hooks.json exist at: {}", path[0].display());
+            println!("config.toml exist at: {}", path[1].display());
+            break path;
+        } else {
+            let create = Confirm::new()
+                .with_prompt("File does not exist. Do you want to create it?")
+                .default(true)
+                .interact()
+                .unwrap();
+            if create {
+                fs::create_dir_all(path[0].parent().unwrap()).expect("Failed to create directories");
+                fs::write(&path[0], "{}").expect("Failed to create file");
+                fs::write(&path[1], "").expect("Failed to create file");
+                println!("Created files at: {}", path[0].display());
+                break path;
+            }
+        }
+    };
+
+    let mut config: Value = {
+        let content = fs::read_to_string(&config_path[0]).expect("Failed to read config file");
+        serde_json::from_str(&content).unwrap_or(json!({}))
+    };
+
+    let backup = config_path[0].with_extension("json.bak");
+    fs::copy(&config_path[0], &backup).expect("Failed to create backup");
+    println!("Backup created at: {}", backup.display());
+
+    let backup = config_path[1].with_extension("toml.bak");
+    fs::copy(&config_path[1], &backup).expect("Failed to create backup");
+    println!("Backup created at: {}", backup.display());
+
+    let content = fs::read_to_string(&config_path[1]).expect("Failed to read config file");
+    let mut doc = content.parse::<DocumentMut>().map_err(|e| e.to_string()).expect("Failed to parse config.toml");
+
+    if doc.get("features").is_none() {
+        doc["features"] = toml_edit::table();
+    }
+
+    doc["features"]["codex_hooks"] = value(true);
+    
+    fs::write(&config_path[1], doc.to_string()).expect("Failed to write config.toml");
+
+    config["hooks"] = build_hooks(&base_url);
+    let output = serde_json::to_string_pretty(&config).expect("Failed to serialize config");
+    fs::write(&config_path[0], output).expect("Failed to write config file");
+
+    println!("✓ Write to hooks successfully, all events reported to http://{}/[EventName]", base_url);
+    println!("  PreToolUse / PostToolUse will append the tool name to the path, e.g., /PreToolUse/Bash");
+}
+
+fn main() {
+    let (ip, port) = parse_args();
+    let base_url = format!("{}:{}", ip, port);
+    let agent = vec![
+        "Claude Code",
+        "Codex",
+        "both Claude Code and Codex",
+        "exit",
+    ];
+    let selection = Select::with_theme(&ColorfulTheme::default())
+            .with_prompt("which agent do you want to add hooks for?")
+            .items(&agent)
+            .default(0)
+            .interact()
+            .unwrap();
+    match selection {
+        0 => {
+            hook_cc(&base_url);
+        }
+        1 => {
+            hook_codex(&base_url);
+        }
+        2 => {
+            hook_cc(&base_url);
+            hook_codex(&base_url);
+        }
+        3 => {
+            println!("Exiting.");
+            return;
+        }
+        _ => unreachable!(),
+    }
+    
 }
