@@ -40,31 +40,22 @@ fn make_curl_hook(base_url: &str, path: &str, agent: &str) -> Value {
     })
 }
 
-fn make_curl_hook_with_tool(base_url: &str, path: &str, agent: &str) -> Value {
-    json!({
-        "type": "command",
-        "command": format!(
-            "input=$(cat); tool=$(echo $input | jq -r '.tool_name // \"unknown\"'); curl -s http://{}/{}?a1={}&a2=$(echo $tool | tr '/' '_')",
-            base_url, path, agent
-        )
-    })
-}
 
 fn build_hooks(base_url: &str, agent: &str) -> Value {
     json!({
         "PreToolUse": [{
             "matcher": ".*",
-            "hooks": [make_curl_hook_with_tool(base_url, "PreToolUse", agent)]
+            "hooks": [make_curl_hook(base_url, "PreToolUse", agent)]
         }],
 
         "PostToolUse": [{
             "matcher": ".*",
-            "hooks": [make_curl_hook_with_tool(base_url, "PostToolUse", agent)]
+            "hooks": [make_curl_hook(base_url, "PostToolUse", agent)]
         }],
 
         "PostToolUseFailure": [{
             "matcher": ".*",
-            "hooks": [make_curl_hook_with_tool(base_url, "PostToolUseFailure", agent)]
+            "hooks": [make_curl_hook(base_url, "PostToolUseFailure", agent)]
         }],
 
         "PermissionRequest": [{
