@@ -33,70 +33,70 @@ fn parse_args() -> (String, u16) {
     (ip, port)
 }
 
-fn make_curl_hook(base_url: &str, path: &str) -> Value {
+fn make_curl_hook(base_url: &str, path: &str, agent: &str) -> Value {
     json!({
         "type": "command",
-        "command": format!("curl -s http://{}/{}", base_url, path)
+        "command": format!("curl -s http://{}/{}?a1={}", base_url, path, agent)
     })
 }
 
-fn make_curl_hook_with_tool(base_url: &str, path: &str) -> Value {
+fn make_curl_hook_with_tool(base_url: &str, path: &str, agent: &str) -> Value {
     json!({
         "type": "command",
         "command": format!(
-            "input=$(cat); tool=$(echo $input | jq -r '.tool_name // \"unknown\"'); curl -s http://{}/{}/$(echo $tool | tr '/' '_')",
-            base_url, path
+            "input=$(cat); tool=$(echo $input | jq -r '.tool_name // \"unknown\"'); curl -s http://{}/{}?a1={}&a2=$(echo $tool | tr '/' '_')",
+            base_url, path, agent
         )
     })
 }
 
-fn build_hooks(base_url: &str) -> Value {
+fn build_hooks(base_url: &str, agent: &str) -> Value {
     json!({
         "PreToolUse": [{
             "matcher": ".*",
-            "hooks": [make_curl_hook_with_tool(base_url, "PreToolUse")]
+            "hooks": [make_curl_hook_with_tool(base_url, "PreToolUse", agent)]
         }],
 
         "PostToolUse": [{
             "matcher": ".*",
-            "hooks": [make_curl_hook_with_tool(base_url, "PostToolUse")]
+            "hooks": [make_curl_hook_with_tool(base_url, "PostToolUse", agent)]
         }],
 
         "PostToolUseFailure": [{
             "matcher": ".*",
-            "hooks": [make_curl_hook_with_tool(base_url, "PostToolUseFailure")]
+            "hooks": [make_curl_hook_with_tool(base_url, "PostToolUseFailure", agent)]
         }],
 
         "PermissionRequest": [{
             "matcher": ".*",
-            "hooks": [make_curl_hook(base_url, "PermissionRequest")]
+            "hooks": [make_curl_hook(base_url, "PermissionRequest", agent)]
         }],
 
         "Stop": [{
-            "hooks": [make_curl_hook(base_url, "Stop")]
+            "hooks": [make_curl_hook(base_url, "Stop", agent)]
         }],
 
         "SubagentStop": [{
-            "hooks": [make_curl_hook(base_url, "SubagentStop")]
+            "hooks": [make_curl_hook(base_url, "SubagentStop", agent)]
         }],
 
         "Notification": [{
-            "hooks": [make_curl_hook(base_url, "Notification")]
+            "hooks": [make_curl_hook(base_url, "Notification", agent)]
         }],
 
         "UserPromptSubmit": [{
-            "hooks": [make_curl_hook(base_url, "UserPromptSubmit")]
+            "hooks": [make_curl_hook(base_url, "UserPromptSubmit", agent)]
         }],
 
         "SessionStart": [{
-            "hooks": [make_curl_hook(base_url, "SessionStart")]
+            "hooks": [make_curl_hook(base_url, "SessionStart", agent)]
         }],
         "SessionEnd": [{
-            "hooks": [make_curl_hook(base_url, "SessionEnd")]
+            "hooks": [make_curl_hook(base_url, "SessionEnd", agent)]
         }],
 
         "PreCompact": [{
-            "hooks": [make_curl_hook(base_url, "PreCompact")]
+            "hooks": [make_curl_hook(base_url, "PreCompact", agent)]
         }]
     })
 }
@@ -173,7 +173,7 @@ fn hook_cc(base_url: &str) {
     fs::copy(&config_path, &backup).expect("Failed to create backup");
     println!("Backup created at: {}", backup.display());
 
-    config["hooks"] = build_hooks(&base_url);
+    config["hooks"] = build_hooks(&base_url,"CC");
     let output = serde_json::to_string_pretty(&config).expect("Failed to serialize config");
     fs::write(&config_path, output).expect("Failed to write config file");
 
@@ -269,7 +269,7 @@ fn hook_codex(base_url: &str) {
     
     fs::write(&config_path[1], doc.to_string()).expect("Failed to write config.toml");
 
-    config["hooks"] = build_hooks(&base_url);
+    config["hooks"] = build_hooks(&base_url, "Codex");
     let output = serde_json::to_string_pretty(&config).expect("Failed to serialize config");
     fs::write(&config_path[0], output).expect("Failed to write config file");
 
