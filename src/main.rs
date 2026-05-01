@@ -164,7 +164,7 @@ fn hook_cc(base_url: &str) {
     fs::copy(&config_path, &backup).expect("Failed to create backup");
     println!("Backup created at: {}", backup.display());
 
-    config["hooks"] = build_hooks(&base_url,"CC");
+    config["hooks"] = build_hooks(&base_url,"Claude+Code");
     let output = serde_json::to_string_pretty(&config).expect("Failed to serialize config");
     fs::write(&config_path, output).expect("Failed to write config file");
 
