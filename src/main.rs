@@ -381,49 +381,49 @@ fn build_hooks(ipc_helper: &Path, agent: &str) -> Value {
     json!({
         "PreToolUse": [{
             "matcher": ".*",
-            "hooks": make_ipc_hook(ipc_helper, agent)
+            "hooks": [make_ipc_hook(ipc_helper, agent)]
         }],
 
         "PostToolUse": [{
             "matcher": ".*",
-            "hooks": make_ipc_hook(ipc_helper, agent)
+            "hooks": [make_ipc_hook(ipc_helper, agent)]
         }],
 
         "PostToolUseFailure": [{
             "matcher": ".*",
-            "hooks": make_ipc_hook(ipc_helper, agent)
+            "hooks": [make_ipc_hook(ipc_helper, agent)]
         }],
 
         "PermissionRequest": [{
             "matcher": ".*",
-            "hooks": make_ipc_hook(ipc_helper, agent)
+            "hooks": [make_ipc_hook(ipc_helper, agent)]
         }],
 
         "Stop": [{
-            "hooks": make_ipc_hook(ipc_helper, agent)
+            "hooks": [make_ipc_hook(ipc_helper, agent)]
         }],
 
         "SubagentStop": [{
-            "hooks": make_ipc_hook(ipc_helper, agent)
+            "hooks": [make_ipc_hook(ipc_helper, agent)]
         }],
 
         "Notification": [{
-            "hooks": make_ipc_hook(ipc_helper, agent)
+            "hooks": [make_ipc_hook(ipc_helper, agent)]
         }],
 
         "UserPromptSubmit": [{
-            "hooks": make_ipc_hook(ipc_helper, agent)
+            "hooks": [make_ipc_hook(ipc_helper, agent)]
         }],
 
         "SessionStart": [{
-            "hooks": make_ipc_hook(ipc_helper, agent)
+            "hooks": [make_ipc_hook(ipc_helper, agent)]
         }],
         "SessionEnd": [{
-            "hooks": make_ipc_hook(ipc_helper, agent)
+            "hooks": [make_ipc_hook(ipc_helper, agent)]
         }],
 
         "PreCompact": [{
-            "hooks": make_ipc_hook(ipc_helper, agent)
+            "hooks": [make_ipc_hook(ipc_helper, agent)]
         }]
     })
 }
